@@ -66,15 +66,37 @@
 			<div class="tsd-panel tsd-typography">
 				<h1 id="async-i2c-bus">async-i2c-bus</h1>
 				<p><img src="https://img.shields.io/npm/v/async-i2c-bus.svg" alt=""> <img src="https://img.shields.io/david/AlejandroHerr/async-i2c-bus.svg?style=flat-square" alt=""> <img src="https://img.shields.io/david/dev/AlejandroHerr/async-i2c-bus.svg?style=flat-square" alt=""> <img src="https://img.shields.io/circleci/project/github/AlejandroHerr/async-i2c-bus/master.svg?style=flat-square&logo=circleci" alt="CircleCI"> <a href="https://github.com/semantic-release/semantic-release"><img src="https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg?style=flat-square" alt="semantic-release"></a> <img src="https://img.shields.io/github/license/AlejandroHerr/async-i2c-bus.svg?style=flat-square" alt=""></p>
-				<h2 id="install">Install</h2>
-				<p>Choose your flavour, npm or yarn:</p>
-				<pre><code class="language-bash">yarn add async-i2c-bus
-
-npm i -P async-i2c-bus</code></pre>
+				<p>Promised Bus and Device factories for <a href="https://github.com/fivdi/i2c-bus">i2c-bus</a>.</p>
+				<p>This package replaces <a href="https://github.com/AlejandroHerr/i2c-bus-promised">i2c-bus-promised</a></p>
+				<h2 id="installation">Installation</h2>
+				<p>Choose your flavour, yarn:</p>
+				<pre><code class="language-bash">yarn add async-i2c-bus</code></pre>
+				<p>or npm:</p>
+				<pre><code class="language-bash">npm i -P async-i2c-bus</code></pre>
 				<p>And you&#39;re ready to go.</p>
-				<pre><code class="language-js"><span class="hljs-keyword">import</span> { Bus, Device } <span class="hljs-keyword">from</span> <span class="hljs-string">'../dist/main'</span>;
-
-<span class="hljs-keyword">const</span> WEATHER_SENSOR_ADDRESS = <span class="hljs-number">0x77</span>;
+				<h3 id="requirements">Requirements</h3>
+				<p>The package requires node <code>v8.10.x</code> or higher.
+				If you need a compatibility with lower versions of node, you can build it. To do so clone the repo in your workspace, and modify the <code>target</code> options in the <code>tsconfig.json</code>, e.g:</p>
+				<pre><code class="language-json">{
+  "compilerOptions": {
+    "target": "es5", // &lt;-- Line changed
+    "outDir": "dist/main",
+    "rootDir": "src",
+    // ..</code></pre>
+				<p>And build the module with <code>yarn build</code> or <code>npm run build</code>.</p>
+				<h2 id="usage">Usage</h2>
+				<p>The package exports the <code>Bus</code> factory to create a <code>BusInterface</code>. The <code>BusInterface</code> is an object with the same methods available in the original <code>i2c-bus</code> but promised. The signature of the factory is the following:</p>
+				<pre><code class="language-js"><span class="hljs-keyword">const</span> Bus = ({ busNumber = <span class="hljs-number">1</span>, openBus = openI2cBus } = {}): BusInterface</code></pre>
+				<ul>
+					<li><code>busNumber</code> is the i2c bus number, and defaults to 1. Unless your devices has more than one bus, it will suit you.</li>
+					<li><code>openBus</code> is the function to open the bus. It defaults to <code>i2c.openBus</code>, but it would accept any function with the same signature. You shouldn&#39;t pass this value, except if you&#39;re in a testing environment.</li>
+				</ul>
+				<p>The package also exports the <code>Device</code> factory to create a <code>DeviceInterface</code>. This is a helper method to call the <code>i2cBus</code> methods with the address of your device. It has the following signature:</p>
+				<pre><code class="language-js"><span class="hljs-keyword">const</span> Device = ({ address, bus }: { <span class="hljs-attr">address</span>: number; bus: BusInterface }): DeviceInterface</code></pre>
+				<p>You don&#39;t need to use a <code>DeviceInterface</code> in order to work with this library, but it helps.</p>
+				<p>For more details, check the full auto-generated <a href="https://alejandroherr.github.io/async-i2c-bus/">documentation</a>.</p>
+				<h3 id="example">Example</h3>
+				<pre><code class="language-js"><span class="hljs-keyword">const</span> WEATHER_SENSOR_ADDRESS = <span class="hljs-number">0x77</span>;
 
 <span class="hljs-keyword">const</span> main = <span class="hljs-keyword">async</span> () =&gt; {
   <span class="hljs-keyword">const</span> bus = Bus();
@@ -98,6 +120,65 @@ npm i -P async-i2c-bus</code></pre>
 
   <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Temperature: <span class="hljs-subst">${temperature}</span>`</span>);
 };</code></pre>
+				<h3 id="example-extending-device">Example extending device</h3>
+				<p>Also you can extend your device to implement specific methods. Take the previous case:</p>
+				<pre><code class="language-js"><span class="hljs-keyword">const</span> WeatherSensor = <span class="hljs-function">(<span class="hljs-params">{ bus }</span>) =&gt;</span> ({
+  ...Device({ <span class="hljs-attr">address</span>: <span class="hljs-number">0x77</span>, bus }),
+  <span class="hljs-keyword">async</span> init() {
+    <span class="hljs-keyword">await</span> <span class="hljs-keyword">this</span>.writeByte(<span class="hljs-number">0xf4</span>, <span class="hljs-number">0b00100101</span>);
+    <span class="hljs-keyword">await</span> <span class="hljs-keyword">this</span>.writeByte(<span class="hljs-number">0xf5</span>, <span class="hljs-number">0b00100100</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+  },
+  <span class="hljs-keyword">async</span> readTemperature() {
+    <span class="hljs-keyword">const</span> buffer = Buffer.alloc(<span class="hljs-number">3</span>);
+
+    <span class="hljs-keyword">await</span> <span class="hljs-keyword">this</span>.readI2cBlock(<span class="hljs-number">0xfa</span>, <span class="hljs-number">3</span>, buffer);
+
+    <span class="hljs-keyword">return</span> buffer.readUIntBE(<span class="hljs-number">0</span>, <span class="hljs-number">3</span>) &gt;&gt;&gt; <span class="hljs-number">4</span>;
+  },
+});
+
+<span class="hljs-keyword">const</span> main = <span class="hljs-keyword">async</span> () =&gt; {
+  <span class="hljs-keyword">const</span> bus = Bus();
+
+  <span class="hljs-keyword">await</span> bus.open();
+
+  <span class="hljs-keyword">const</span> weatherSensor = <span class="hljs-keyword">await</span> WeatherSensor({ bus }).init();
+  <span class="hljs-keyword">const</span> temperature = <span class="hljs-keyword">await</span> weatherSensor.readTemperature();
+
+  <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`Temperature: <span class="hljs-subst">${temperature}</span>`</span>);
+};</code></pre>
+				<h3 id="testing">Testing</h3>
+				<p>Testing i2c code can be expensive and slow. It may take some time to deploy and run your e2e tests/code in a low powered device. For that, you can use the <code>createI2cBusMock</code> function and write some unit tests. Although you shouldn&#39;t relay too much on the values read and written (it works as if the i2c bus is just a memory), it can help you to test that the right functions are being invoked.</p>
+				<pre><code class="language-js"><span class="hljs-keyword">import</span> { Bus, Device } <span class="hljs-keyword">from</span> <span class="hljs-string">'../dist/main'</span>;
+
+jest.mock(<span class="hljs-string">'i2c-bus'</span>, () =&gt; {
+  <span class="hljs-keyword">const</span> createI2cBusMock = <span class="hljs-built_in">require</span>(<span class="hljs-string">'../dist/main/lib/createI2cBusMock'</span>).default; <span class="hljs-comment">// eslint-disable-line global-require</span>
+
+  <span class="hljs-keyword">return</span> {
+    <span class="hljs-attr">open</span>: createI2cBusMock({
+      <span class="hljs-attr">devices</span>: {
+        <span class="hljs-number">0xab</span>: Buffer.allocUnsafe(<span class="hljs-number">0xff</span>),
+      },
+    }),
+  };
+});
+
+describe(<span class="hljs-string">'Device'</span>, () =&gt; {
+  it(<span class="hljs-string">'should write the right command'</span>, <span class="hljs-keyword">async</span> () =&gt; {
+    <span class="hljs-keyword">const</span> busNumber = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">const</span> bus = Bus({ busNumber });
+    <span class="hljs-keyword">const</span> address = <span class="hljs-number">0xab</span>;
+    <span class="hljs-keyword">const</span> device = Device({ address, bus });
+
+    <span class="hljs-keyword">await</span> bus.open();
+
+    <span class="hljs-keyword">const</span> spyOnWriteByte = jest.spyOn(bus, <span class="hljs-string">'writeByte'</span>);
+    <span class="hljs-keyword">await</span> device.writeByte(<span class="hljs-number">0x0f</span>, <span class="hljs-number">0xff</span>);
+    expect(spyOnWriteByte).toHaveBeenCalledWith(address, <span class="hljs-number">0x0f</span>, <span class="hljs-number">0xff</span>);
+  });
+});</code></pre>
 			</div>
 		</div>
 		<div class="col-4 col-menu menu-sticky-wrap menu-highlight">
